@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel – UKK Kuliner</title>
+  <meta name="description" content="Panel admin untuk mengelola data menu, peserta, dan QR voting." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+  <!-- Firebase Compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/data.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const ADMIN_USER = 'admin';
+    const ADMIN_PASS = 'password123';
+
+    /* ── Icon wrapper ── */
+    function Icon({ name, size = 24, style = {}, className = '' }) {
+      const ref = useRef(null);
+      useEffect(() => {
+        if (!ref.current || !window.lucide?.[name]) return;
+        ref.current.innerHTML = '';
+        const svg = window.lucide.createElement(window.lucide[name]);
+        svg.setAttribute('width', size);
+        svg.setAttribute('height', size);
+        if (className) svg.setAttribute('class', className);
+        Object.assign(svg.style, style);
+        ref.current.appendChild(svg);
+      }, [name, size, className]);
+      return <span ref={ref} className="icon" />;
+    }
+
+    /* ════════════════════════════════════════════
+       AdminLogin
+    ════════════════════════════════════════════ */
+    function AdminLogin({ onLogin }) {
+      const [username, setUsername] = useState('');
+      const [password, setPassword] = useState('');
+      const [error, setError]       = useState('');
+      const [loading, setLoading]   = useState(false);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setTimeout(() => {
+          if (username === ADMIN_USER && password === ADMIN_PASS) { onLogin(); }
+          else { setError('Username atau password salah! ⛔'); setLoading(false); }
+        }, 350);
+      };
+
+      return (
+        <div className="admin-login-bg">
+          <div className="admin-login-glow"/>
+          <div className="glass-panel admin-login-card animate-slide-up">
+            <div className="admin-login-icon">
+              <div className="admin-login-icon-box">
+                <Icon name="Lock" size={36} style={{ transform:'rotate(-3deg)', color:'#60a5fa' }}/>
+              </div>
+            </div>
+            <h1 className="admin-login-title">Admin Portal</h1>
+            <p className="admin-login-subtitle">Masuk untuk mengelola sistem voting.</p>
+
+            {error && <div className="alert-error" style={{ marginBottom:'1.25rem' }}><Icon name="XCircle" size={16}/> {error}</div>}
+
+            <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+              {[
+                { icon:'User', type:'text', val:username, set:setUsername, ph:'Username', auto:true },
+                { icon:'Lock', type:'password', val:password, set:setPassword, ph:'••••••••' },
+              ].map((f,i) => (
+                <div key={i} className="input-icon-wrapper">
+                  <span className="icon-slot"><Icon name={f.icon} size={18}/></span>
+                  <input type={f.type} className="form-input form-input-icon" placeholder={f.ph}
+                    value={f.val} onChange={e => { f.set(e.target.value); setError(''); }}
+                    autoFocus={f.auto} required />
+                </div>
+              ))}
+              <button type="submit" className="btn btn-blue"
+                style={{ marginTop:'.5rem', padding:'.875rem', fontSize:'1rem', justifyContent:'center', opacity:loading?.7:1 }}
+                disabled={loading}>
+                {loading ? 'Memverifikasi…' : 'Login Secure'}
+              </button>
+            </form>
+            <p style={{ textAlign:'center', marginTop:'1.5rem', fontSize:'.8rem', color:'#64748b' }}>
+              <a href="projector.html" style={{ color:'#60a5fa', textDecoration:'none' }}>← Kembali ke Proyektor</a>
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    /* ════════════════════════════════════════════
+       AddMenuModal
+    ════════════════════════════════════════════ */
+    function AddMenuModal({ onClose, onAdd }) {
+      const [name,    setName]    = useState('');
+      const [cook,    setCook]    = useState('');
+      const [table,   setTable]   = useState('');
+      const [saving,  setSaving]  = useState(false);
+      const [err,     setErr]     = useState('');
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!name.trim() || !cook.trim() || !table.trim()) return;
+        setSaving(true);
+        setErr('');
+        try {
+          await onAdd({ name, cook, table });
+          onClose();
+        } catch(e) {
+          setErr('Gagal menyimpan. Periksa koneksi dan coba lagi.');
+          setSaving(false);
+        }
+      };
+
+      const fields = [
+        { label:'Nama Menu Makanan', val:name,  set:setName,  ph:'Misal: Sate Lilit Khas Bali', auto:true },
+        { label:'Nomor Meja',        val:table, set:setTable, ph:'Misal: 01' },
+        { label:'Nama Siswa / Koki', val:cook,  set:setCook,  ph:'Misal: Ahmad Dhani' },
+      ];
+
+      return (
+        <div className="modal-overlay modal-overlay-fixed">
+          <div className="modal-card animate-slide-up-fast">
+            <button className="modal-close" onClick={onClose}><Icon name="X" size={20}/></button>
+            <h2 className="modal-title"><Icon name="Utensils" size={22} style={{ color:'#34d399' }}/> Tambah Menu Baru</h2>
+            {err && <div className="alert-error" style={{ marginBottom:'1rem' }}>{err}</div>}
+            <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+              {fields.map((f,i) => (
+                <div key={i}>
+                  <label className="form-label">{f.label}</label>
+                  <input type="text" className="form-input" placeholder={f.ph}
+                    value={f.val} onChange={e=>f.set(e.target.value)} autoFocus={f.auto} required />
+                </div>
+              ))}
+              <button type="submit" className="btn btn-primary"
+                style={{ marginTop:'.5rem', padding:'.875rem', fontSize:'1rem', justifyContent:'center', opacity:saving?.7:1 }}
+                disabled={saving}>
+                <Icon name="QrCode" size={18}/>
+                {saving ? 'Menyimpan…' : 'Simpan & Generate QR'}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    /* ════════════════════════════════════════════
+       AdminDashboard
+    ════════════════════════════════════════════ */
+    function AdminDashboard({ onLogout }) {
+      const [foods,        setFoods]        = useState([]);
+      const [loading,      setLoading]      = useState(true);
+      const [copiedToken,  setCopiedToken]  = useState('');
+      const [showAddModal, setShowAddModal] = useState(false);
+      const [resetting,    setResetting]    = useState(false);
+
+      // Real-time listener
+      useEffect(() => {
+        const unsubscribe = onFoodsChange((data) => { setFoods(data); setLoading(false); });
+        return unsubscribe;
+      }, []);
+
+      const voteBase = (() => {
+        const href = window.location.href.split('?')[0];
+        return href.replace(/\/[^/]*$/, '/vote.html');
+      })();
+
+      const handleReset = async () => {
+        if (!confirm('⚠️ PERINGATAN: Reset semua vote menjadi 0 dan izinkan semua perangkat vote ulang?\nData tidak dapat dikembalikan!')) return;
+        setResetting(true);
+        try { await resetAllVotes(foods); }
+        catch(e) { alert('Gagal reset: ' + e.message); }
+        setResetting(false);
+      };
+
+      const handleDelete = async (foodId, name) => {
+        if (!confirm(`Hapus menu "${name}" secara permanen?`)) return;
+        try { await deleteFood(foodId); }
+        catch(e) { alert('Gagal menghapus: ' + e.message); }
+      };
+
+      const handleAddFood = async (data) => { await addFood(data); };
+
+      const handleCopy = (token) => {
+        const link = `${voteBase}?vote=${token}`;
+        navigator.clipboard.writeText(link).catch(() => {
+          const ta = document.createElement('textarea');
+          ta.value = link; document.body.appendChild(ta); ta.select();
+          document.execCommand('copy'); document.body.removeChild(ta);
+        });
+        setCopiedToken(token);
+        setTimeout(() => setCopiedToken(''), 2000);
+      };
+
+      const totalVotes = foods.reduce((s, f) => s + (f.votes || 0), 0);
+
+      return (
+        <div className="admin-layout">
+          {/* Sidebar */}
+          <aside className="admin-sidebar">
+            <div className="admin-sidebar-header">
+              <div className="admin-sidebar-title">
+                <Icon name="LayoutDashboard" size={24} style={{ color:'#3b82f6' }}/> Admin Panel
+              </div>
+            </div>
+            <nav className="admin-sidebar-nav">
+              <button className="admin-sidebar-btn"><Icon name="Utensils" size={18}/> Data Menu & QR</button>
+            </nav>
+            <div className="admin-sidebar-footer">
+              <a href="projector.html" className="btn btn-ghost" style={{ width:'100%', justifyContent:'center', marginBottom:'.5rem', textDecoration:'none' }}>
+                <Icon name="MonitorPlay" size={16}/> Lihat Proyektor
+              </a>
+              <button className="btn btn-danger-ghost" style={{ width:'100%', justifyContent:'center' }} onClick={onLogout}>
+                <Icon name="LogOut" size={16}/> Keluar
+              </button>
+            </div>
+          </aside>
+
+          {/* Main */}
+          <main className="admin-main">
+            <div style={{ maxWidth:'80rem', margin:'0 auto' }}>
+
+              {/* Header */}
+              <div className="admin-main-header">
+                <div>
+                  <h2 className="admin-main-title">Manajemen Data & QR Voting</h2>
+                  <p className="admin-main-subtitle">Kelola daftar menu, peserta, serta link akses voting.</p>
+                </div>
+                <div className="admin-action-bar">
+                  <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+                    <Icon name="Plus" size={18}/> Tambah Menu Baru
+                  </button>
+                  <button className="btn btn-dark" onClick={handleReset} disabled={resetting} style={{ opacity:resetting?.6:1 }}>
+                    <Icon name="Trash2" size={16}/> {resetting?'Mereset…':'Reset Voting'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div style={{ display:'flex', gap:'1rem', marginBottom:'1.5rem', flexWrap:'wrap' }}>
+                {[
+                  { label:'Total Menu',    value:foods.length, icon:'Utensils',     color:'#34d399' },
+                  { label:'Total Vote',    value:totalVotes,   icon:'CheckCircle2', color:'#60a5fa' },
+                  { label:'Menu Tervoting', value:foods.filter(f=>f.votes>0).length, icon:'Trophy', color:'#f59e0b' },
+                ].map((s,i) => (
+                  <div key={i} className="glass-panel" style={{ padding:'1rem 1.5rem', borderRadius:'1rem', display:'flex', alignItems:'center', gap:'.75rem', flex:1, minWidth:'150px' }}>
+                    <div style={{ width:'2.5rem',height:'2.5rem',borderRadius:'.625rem',background:`${s.color}20`,display:'flex',alignItems:'center',justifyContent:'center' }}>
+                      <Icon name={s.icon} size={20} style={{ color:s.color }}/>
+                    </div>
+                    <div>
+                      <div style={{ fontSize:'1.5rem',fontWeight:900,color:'#fff' }}>{s.value}</div>
+                      <div style={{ fontSize:'.75rem',color:'#94a3b8',fontWeight:500 }}>{s.label}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Loading */}
+              {loading && (
+                <div className="glass-panel" style={{ padding:'3rem', textAlign:'center', borderRadius:'1.5rem' }}>
+                  <div style={{ width:'2.5rem',height:'2.5rem',border:'3px solid rgba(255,255,255,.1)',borderTopColor:'#34d399',borderRadius:'50%',animation:'spin .8s linear infinite',margin:'0 auto 1rem' }}/>
+                  <p style={{ color:'#64748b' }}>Memuat data dari Firebase…</p>
+                </div>
+              )}
+
+              {/* Empty */}
+              {!loading && foods.length === 0 && (
+                <div className="glass-panel empty-state">
+                  <Icon name="Utensils" size={64} style={{ color:'#334155', marginBottom:'1rem' }}/>
+                  <h3 className="empty-state-title">Belum Ada Menu Terdaftar</h3>
+                  <p className="empty-state-subtitle">Tambahkan menu pertama untuk memulai voting.</p>
+                  <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+                    <Icon name="Plus" size={18}/> Tambah Sekarang
+                  </button>
+                </div>
+              )}
+
+              {/* Food Cards */}
+              {!loading && foods.length > 0 && (
+                <div className="food-cards-grid">
+                  {foods.map(food => {
+                    const voteLink = `${voteBase}?vote=${food.token}`;
+                    const isCopied = copiedToken === food.token;
+                    return (
+                      <div key={food.id} className="glass-panel food-card">
+                        <div className="food-card-body">
+                          <div className="food-card-info">
+                            <h3 className="food-card-name">{food.name}</h3>
+                            <p className="food-card-cook">
+                              <Icon name="ChefHat" size={14} style={{ color:'#64748b' }}/>
+                              Meja {food.table||'-'} : {food.cook||'Siswa'}
+                            </p>
+                            <div className="food-card-votes">
+                              <span className="food-card-votes-label">Perolehan:</span>
+                              <strong className="food-card-votes-count">{food.votes||0}</strong>
+                              <span className="food-card-votes-unit">Vote</span>
+                            </div>
+                          </div>
+                          <div className="food-card-actions-side">
+                            <button className="btn btn-dark" style={{ padding:'.5rem' }}
+                              title="Hapus" onClick={() => handleDelete(food.id, food.name)}>
+                              <Icon name="Trash2" size={16} style={{ color:'#f87171' }}/>
+                            </button>
+                            <div className="qr-box">
+                              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(voteLink)}`}
+                                alt={`QR ${food.name}`} style={{ width:'80px',height:'80px',borderRadius:'.5rem',display:'block' }}/>
+                              <span className="qr-label" title={`Meja ${food.table||'-'} – ${food.cook}`}>
+                                M.{food.table||'-'} {food.cook||'Siswa'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="food-card-footer">
+                          <button className={`btn ${isCopied?'btn-primary':'btn-dark'}`} onClick={() => handleCopy(food.token)}>
+                            <Icon name={isCopied?'CheckCircle2':'Copy'} size={14}/>
+                            {isCopied?'Tersalin!':'Copy Link'}
+                          </button>
+                          <button className="btn btn-blue" onClick={() => window.open(voteLink,'_blank')}>
+                            Test Vote <Icon name="ExternalLink" size={13}/>
+                          </button>
+                          <button className="btn btn-dark" style={{ padding:'.625rem .875rem' }}
+                            onClick={() => window.open(`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(voteLink)}`,'_blank')}
+                            title="Print QR">
+                            <Icon name="QrCode" size={16}/>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </main>
+
+          {showAddModal && <AddMenuModal onClose={() => setShowAddModal(false)} onAdd={handleAddFood}/>}
+        </div>
+      );
+    }
+
+    /* ════════════════════════════════════════════
+       AdminApp (root)
+    ════════════════════════════════════════════ */
+    function AdminApp() {
+      const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+      return (
+        <div className="page-wrapper">
+          {isLoggedIn && (
+            <nav className="navbar glass-panel">
+              <div className="navbar-brand">
+                <div className="navbar-logo"><Icon name="Settings" size={22} style={{ color:'#60a5fa' }}/></div>
+                <div>
+                  <div className="navbar-title" style={{ background:'linear-gradient(90deg,#60a5fa,#818cf8)', WebkitBackgroundClip:'text', backgroundClip:'text', WebkitTextFillColor:'transparent' }}>ADMIN PANEL</div>
+                  <div className="navbar-subtitle">UKK Kuliner 2024</div>
+                </div>
+              </div>
+              <div className="navbar-actions">
+                <a href="projector.html" className="btn btn-ghost" style={{ textDecoration:'none' }}><Icon name="MonitorPlay" size={15}/> Proyektor</a>
+                <button className="btn btn-danger-ghost" onClick={() => setIsLoggedIn(false)}><Icon name="LogOut" size={15}/> Keluar</button>
+              </div>
+            </nav>
+          )}
+          <main style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+            {isLoggedIn
+              ? <AdminDashboard onLogout={() => setIsLoggedIn(false)}/>
+              : <AdminLogin onLogin={() => setIsLoggedIn(true)}/>
+            }
+          </main>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<AdminApp/>);
+  </script>
+</body>
+</html>
