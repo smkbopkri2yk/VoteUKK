@@ -814,21 +814,42 @@
         const canvas = document.createElement('canvas');
         canvas.width = 500; canvas.height = 700;
         const ctx = canvas.getContext('2d');
+        
+        // White background
         ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,500,700);
-        ctx.fillStyle = '#000000';
-        ctx.font = 'bold 40px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText(`MEJA ${table}`, 250, 80);
-        ctx.font = '24px sans-serif'; ctx.fillText(cook, 250, 120);
+
+        // Border
+        ctx.strokeStyle = '#020617'; ctx.lineWidth = 15;
+        ctx.strokeRect(7.5, 7.5, 485, 685);
+
+        // Header Branding
+        ctx.fillStyle = '#020617'; ctx.textAlign = 'center';
+        ctx.font = 'bold 30px sans-serif'; ctx.fillText('UKK KULINER 2026', 250, 70);
+        
+        // Table Info
+        ctx.font = '900 70px sans-serif'; ctx.fillText(`MEJA ${table}`, 250, 150);
+        ctx.font = '600 28px sans-serif'; ctx.fillText(cook || 'Peserta', 250, 195);
+
+        // Separator
+        ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(100, 220); ctx.lineTo(400, 220); ctx.stroke();
+
         const img = new Image();
+        img.crossOrigin = 'Anonymous'; // CRITICAL: Fix for Tainted Canvas
         img.src = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(voteLink)}`;
         img.onload = () => {
-          ctx.drawImage(img, 50, 180, 400, 400);
-          ctx.font = '16px sans-serif'; ctx.fillText('Scan untuk memberikan suara', 250, 630);
+          ctx.drawImage(img, 50, 240, 400, 400);
+          
+          // Footer
+          ctx.fillStyle = '#64748b'; 
+          ctx.font = 'bold 18px sans-serif'; ctx.fillText('SCAN UNTUK MEMBERIKAN SUARA', 250, 665);
+          
           const link = document.createElement('a');
-          link.download = `QR_Meja_${table}.png`;
-          link.href = canvas.toDataURL();
+          link.download = `QR_Meja_${table}_${cook}.png`;
+          link.href = canvas.toDataURL('image/png');
           link.click();
         };
+        img.onerror = () => alert('Gagal memuat QR Code. Pastikan koneksi internet stabil.');
       };
 
       return (
